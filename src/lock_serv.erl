@@ -39,7 +39,7 @@ lock(Key, WaitMillis) ->
                 {acquiring, Key, From} ->
                     From ! {ack, self()},
                     receive {acquired, Key} -> ok end
-                after Wait -> unavailable
+                after Wait -> locked
             end
     end.
 
