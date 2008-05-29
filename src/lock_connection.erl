@@ -30,21 +30,12 @@ process_command(Socket, "lock", [Key, WaitStr]) ->
     % Don't wait longer than erlang allows me to.
     Wait = lists:min([WaitSecs * 1000, 16#ffffffff]),
     error_logger:info_msg("Waiting ~p for ~p~n", [Wait, Key]),
-    case lock_serv:lock(Key, Wait) of
+    case lock_serv:lock(Key, WaitSecs) of
         ok ->
             error_logger:info_msg("Locked ~p~n", [Key]),
             send_response(Socket, 200, "Acquired");
-        delayed ->
-            receive
-                {acquiring, Key, From} ->
-                    From ! {ack, self()},
-                    receive
-                        {acquired, Key} ->
-                            send_response (Socket, 200, "Acquired")
-                    end
-                after Wait ->
-                    send_response(Socket, 404, "Unavailable")
-            end
+        _ ->
+            send_response(Socket, 404, "Unavailable")
     end;
 process_command(Socket, "unlock", [Key]) ->
     case lock_serv:unlock(Key) of
