@@ -113,7 +113,6 @@ add_client(Key, From, D) ->
 
 remove_client(Key, From, D) ->
     case get_client_list(From, D) of
-        [] -> D;
         [Key] -> dict:erase(From, D);
         L -> dict:store(From, lists:delete(Key, L), D)
     end.
@@ -149,8 +148,7 @@ try_waiter(Key, From, Q, Locks) ->
                 Waiter ! {acquired, Key},
                 unconditional_lock(Key, Waiter,
                     Locks#lock_state{
-                        waiters=dict:store(Key, Q2, Locks#lock_state.waiters)});
-            _ -> try_waiter(Key, From, Q2, Locks)
+                        waiters=dict:store(Key, Q2, Locks#lock_state.waiters)})
             after 25 ->
                 try_waiter(Key, From, Q2, Locks)
         end
