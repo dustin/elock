@@ -25,6 +25,26 @@ process_command(Socket, "lock", [Key]) ->
         _ ->
             send_response(Socket, 404, "Unavailable")
     end;
+process_command(Socket, "lock", [Key, WaitStr]) ->
+    {WaitSecs, []} = string:to_integer(WaitStr),
+    Wait = WaitSecs * 1000,
+    error_logger:info_msg("Waiting ~p for ~p~n", [Wait, Key]),
+    case lock_serv:lock(Key, Wait) of
+        ok ->
+            error_logger:info_msg("Locked ~p~n", [Key]),
+            send_response(Socket, 200, "Acquired");
+        delayed ->
+            receive
+                {acquiring, Key, From} ->
+                    From ! {ack, self()},
+                    receive
+                        {acquired, Key} ->
+                            send_response (Socket, 200, "Acquired")
+                    end
+                after Wait ->
+                    send_response(Socket, 404, "Unavailable")
+            end
+    end;
 process_command(Socket, "unlock", [Key]) ->
     case lock_serv:unlock(Key) of
         ok ->
@@ -71,6 +91,10 @@ loop(Socket, IncomingData) ->
             error_logger:error_msg("lock_serv:  socket error:  ~p~n", [Reason]),
             gen_tcp:close(Socket),
             lock_exit(Reason);
+        % This happens when we obtain a lock after having lost interest
+        {acquiring, _Key, From} ->
+			From ! nak,
+			loop(Socket, CurrentData);
         % Deaths
         close ->
             gen_tcp:close(Socket),
