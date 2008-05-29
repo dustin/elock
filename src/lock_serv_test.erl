@@ -21,7 +21,8 @@ rpc(Child, Message, Args, Timeout) ->
     receive
         {res, M} -> M
         after Timeout ->
-            exit(io_lib:format("Timed out waiting for ~p", [Message]))
+            exit(lists:flatten(
+                io_lib:format("Timed out waiting for ~p", [Message])))
     end.
 
 rpc(Child, Message, Args) -> rpc(Child, Message, Args, 100).
