@@ -6,6 +6,8 @@
 -export([lock/1, unlock/1]).
 -export([init/1, handle_call/3, handle_cast/2]).
 
+-record(lock_state, {locks=dict:new()}).
+
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
@@ -27,7 +29,7 @@ unlock(Key) ->
     gen_server:call(?MODULE, {unlock, Key}).
 
 init(_Args) ->
-    {ok, dict:new()}.
+    {ok, #lock_state{}}.
 
 handle_call({lock, Key}, From, Locks) ->
     {Response, Locks2} = lock(Key, From, Locks),
@@ -44,16 +46,19 @@ handle_cast(X, Locks) ->
 
 lock(Key, {From, _Something}, Locks) ->
     error_logger:info_msg("Locking from ~p~n", [From]),
-    case dict:find(Key, Locks) of
+    case dict:find(Key, Locks#lock_state.locks) of
         {ok, From} -> {ok, Locks};
         {ok, _Key} -> {locked, Locks};
-        error -> {ok, dict:store(Key, From, Locks)}
+        error ->
+            {ok, Locks#lock_state{locks=dict:store(
+                Key, From, Locks#lock_state.locks)}}
     end.
 
 unlock(Key, {From, _Something}, Locks) ->
-    case dict:find(Key, Locks) of
+    case dict:find(Key, Locks#lock_state.locks) of
         {ok, From} ->
-            {ok, dict:erase(Key, Locks)};
+            {ok, Locks#lock_state{locks=dict:erase(
+                Key, Locks#lock_state.locks)}};
         {ok, _Someone} -> {not_yours, Locks};
         _ -> {not_locked, Locks}
     end.
