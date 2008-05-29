@@ -6,7 +6,11 @@
 -export([lock/1, lock/2, unlock/1]).
 -export([init/1, handle_call/3, handle_cast/2]).
 
--record(lock_state, {locks=dict:new(), waiters=dict:new()}).
+-record(lock_state, {
+    % Currently held locks (key -> pid)
+    locks=dict:new(),
+    % Current clients waiting for lock (key -> queue<pid>)
+    waiters=dict:new()}).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -54,9 +58,7 @@ lock(Key, {From, _Something}, Locks) ->
     case dict:find(Key, Locks#lock_state.locks) of
         {ok, From} -> {ok, Locks};
         {ok, _Key} -> {locked, Locks};
-        error ->
-            {ok, Locks#lock_state{locks=dict:store(
-                Key, From, Locks#lock_state.locks)}}
+        error -> {ok, unconditional_lock(Key, From, Locks)}
     end.
 
 lock(Key, Wait, {From, Something}, Locks) ->
@@ -74,6 +76,10 @@ unlock(Key, {From, _Something}, Locks) ->
     end.
 
 % Private support stuff
+
+% Reserve the lock
+unconditional_lock(Key, From, Locks) ->
+    Locks#lock_state{locks=dict:store(Key, From, Locks#lock_state.locks)}.
 
 % return the specified lock.  If someone else wants it, give it up
 hand_over_lock(Key, Locks) ->
@@ -94,9 +100,9 @@ try_waiter(Key, Q, Locks) ->
         receive
             {ack, Waiter} ->
                 Waiter ! {acquired, Key},
-                Locks#lock_state{
-                    waiters=dict:store(Key, Q2, Locks#lock_state.waiters),
-                    locks=dict:store(Key, Waiter, Locks#lock_state.locks)};
+                unconditional_lock(Key, Waiter,
+                    Locks#lock_state{
+                        waiters=dict:store(Key, Q2, Locks#lock_state.waiters)});
             _ -> try_waiter(Key, Q2, Locks)
             after 25 ->
                 try_waiter(Key, Q2, Locks)
