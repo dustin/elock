@@ -39,6 +39,9 @@ process_command(Socket, "unlock", [Key]) ->
         X  ->
             send_response(Socket, 403, io_lib:format("~p", [X]))
     end;
+process_command(Socket, "unlock_all", []) ->
+    lock_serv:unlock_all(),
+    send_response(Socket, 200, "OK");
 process_command(Socket, "echo", Args) ->
     send_response(Socket, 200, io_lib:format("~p", [Args]));
 process_command(Socket, "quit", _Args) ->
