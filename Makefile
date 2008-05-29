@@ -10,6 +10,7 @@ tgz: lock_serv.tar.gz
 
 test: ebins
 	erl $(EFLAGS) -run lock_serv_test -run init stop
+	open cov.html
 
 ebins:
 	test -d ebin || mkdir ebin

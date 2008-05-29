@@ -3,3 +3,4 @@ lock_serv.boot
 lock_serv.script
 lock_serv.log
 erl_crash.dump
+cov.html

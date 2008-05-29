@@ -97,6 +97,10 @@ start() ->
     error_logger:info_msg("Running tests."),
     lock_serv:start_link(),
 
+    cover:start(),
+    cover:compile("src/lock_serv"),
     tests(),
+    {ok, CovRes} = cover:analyse_to_file(lock_serv, "cov.html", [html]),
+    error_logger:info_msg("Coverage report:  ~p~n", [CovRes]),
     
     error_logger:info_msg("Tests complete~n").
