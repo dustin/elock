@@ -22,7 +22,7 @@ lock_response(Socket, Key, R) ->
             error_logger:info_msg("Locked ~p~n", [Key]),
             send_response(Socket, 200, "Acquired");
         _ ->
-            send_response(Socket, 404, "Unavailable")
+            send_response(Socket, 409, "Unavailable")
     end.
 
 % Commands go here.
@@ -37,7 +37,7 @@ process_command(Socket, "unlock", [Key]) ->
             error_logger:info_msg("Unlocked ~p~n", [Key]),
             send_response(Socket, 200, "Unlocked");
         X  ->
-            send_response(Socket, 404, io_lib:format("~p", [X]))
+            send_response(Socket, 403, io_lib:format("~p", [X]))
     end;
 process_command(Socket, "echo", Args) ->
     send_response(Socket, 200, io_lib:format("~p", [Args]));
