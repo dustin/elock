@@ -1,0 +1,13 @@
+% To make a boot from this:
+% systools:make_script("lock_serv", [local]).
+%
+% To make a tar file for disting:
+% systools:make_tar("lock_serv").
+
+{release,
+	{"lock_serv_rel", "1.0"},
+	{erts, "5.2.3.6"},
+	[	{kernel, "2.12.2"}, {stdlib, "1.15.2"},
+		{lock_tcp_listener, "1.0", temporary}
+		]
+}.
