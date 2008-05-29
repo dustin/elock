@@ -4,11 +4,14 @@
 
 child_loop() ->
     receive
+        {Sender, lock, [Thing, Timeout]} ->
+            Sender ! {res, lock_serv:lock(Thing, Timeout)},
+            child_loop();
         {Sender, lock, [Thing]} ->
-            Sender ! lock_serv:lock(Thing),
+            Sender ! {res, lock_serv:lock(Thing)},
             child_loop();
         {Sender, unlock, [Thing]} ->
-            Sender ! lock_serv:unlock(Thing),
+            Sender ! {res, lock_serv:unlock(Thing)},
             child_loop();
         stop -> ok
     end.
@@ -16,7 +19,7 @@ child_loop() ->
 rpc(Child, Message, Args, Timeout) ->
     Child ! {self(), Message, Args},
     receive
-        M -> M
+        {res, M} -> M
         after Timeout ->
             exit(io_lib:format("Timed out waiting for ~p", [Message]))
     end.
