@@ -59,20 +59,21 @@ lock(Key, {From, _Something}, Locks) ->
                 Key, From, Locks#lock_state.locks)}}
     end.
 
-% I may want to have this thing magically time out after a while.
-enqueue_waiter(Key, _Wait, From, Locks) ->
-    Q = case dict:find(Key, Locks#lock_state.waiters) of
-        {ok, Queue} -> Queue;
-        error -> queue:new()
-    end,
-    Locks#lock_state{waiters=dict:store(
-        Key, queue:in(From, Q), Locks#lock_state.waiters)}.
-
 lock(Key, Wait, {From, Something}, Locks) ->
     case lock(Key, {From, Something}, Locks) of
         {ok, Rv} -> {ok, Rv};
         _ -> {delayed, enqueue_waiter(Key, Wait, From, Locks)}
     end.
+
+unlock(Key, {From, _Something}, Locks) ->
+    case dict:find(Key, Locks#lock_state.locks) of
+        {ok, From} ->
+            {ok, hand_over_lock(Key, Locks)};
+        {ok, _Someone} -> {not_yours, Locks};
+        _ -> {not_locked, Locks}
+    end.
+
+% Private support stuff
 
 % return the specified lock.  If someone else wants it, give it up
 hand_over_lock(Key, Locks) ->
@@ -102,10 +103,11 @@ try_waiter(Key, Q, Locks) ->
         end
     end.
 
-unlock(Key, {From, _Something}, Locks) ->
-    case dict:find(Key, Locks#lock_state.locks) of
-        {ok, From} ->
-            {ok, hand_over_lock(Key, Locks)};
-        {ok, _Someone} -> {not_yours, Locks};
-        _ -> {not_locked, Locks}
-    end.
+% I may want to have this thing magically time out after a while.
+enqueue_waiter(Key, _Wait, From, Locks) ->
+    Q = case dict:find(Key, Locks#lock_state.waiters) of
+        {ok, Queue} -> Queue;
+        error -> queue:new()
+    end,
+    Locks#lock_state{waiters=dict:store(
+        Key, queue:in(From, Q), Locks#lock_state.waiters)}.
