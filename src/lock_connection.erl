@@ -17,6 +17,22 @@ lock_exit(_Reason) ->
     exit(closed).
 
 % Commands go here.
+process_command(Socket, "lock", [Key]) ->
+    case lock_serv:lock(Key) of
+        ok ->
+            error_logger:info_msg("Locked ~p~n", [Key]),
+            send_response(Socket, 200, "Acquired");
+        _ ->
+            send_response(Socket, 404, "Unavailable")
+    end;
+process_command(Socket, "unlock", [Key]) ->
+    case lock_serv:unlock(Key) of
+        ok ->
+            error_logger:info_msg("Unlocked ~p~n", [Key]),
+            send_response(Socket, 200, "Unlocked");
+        X  ->
+            send_response(Socket, 404, io_lib:format("~p", [X]))
+    end;
 process_command(Socket, "echo", Args) ->
     send_response(Socket, 200, io_lib:format("~p", [Args]));
 process_command(Socket, "quit", _Args) ->
