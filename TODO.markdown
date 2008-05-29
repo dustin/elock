@@ -1,13 +1,6 @@
 # Phase 1: Basic semantics
 
 * Auto-free locks on disconnect.
-* Timeout locks.
-* Register for a lock release notification so you can wait for a lock
-  (and let 'em block the client for a while).
-
-# Commands need to be defined
-
-lock(timeout?)
 
 ## stats
 
