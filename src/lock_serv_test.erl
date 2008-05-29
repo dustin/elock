@@ -13,6 +13,9 @@ child_loop() ->
         {Sender, unlock, [Thing]} ->
             Sender ! {res, lock_serv:unlock(Thing)},
             child_loop();
+        {Sender, unlock_all, []} ->
+            Sender ! {res, lock_serv:unlock_all()},
+            child_loop();
         stop -> ok
     end.
 
@@ -51,18 +54,35 @@ test_delayed_lock_release(Child1, Child2) ->
     not_yours = rpc(Child1, unlock, [Key]),
     ok = rpc(Child2, unlock, [Key]).
 
+test_unlock_all(Child1, Child2) ->
+    ok = rpc(Child1, lock, ["key1"]),
+    ok = rpc(Child1, lock, ["key2"]),
+    locked = rpc(Child2, lock, ["key1"]),
+    locked = rpc(Child2, lock, ["key2"]),
+    rpc(Child1, unlock_all, []),
+    ok = rpc(Child2, lock, ["key1"]),
+    ok = rpc(Child2, lock, ["key2"]).
+
+drain_mailbox() ->
+    case receive _M -> ok after 1 -> done end of
+        ok -> drain_mailbox();
+        done -> ok
+    end.
+
 run_test(F) ->
     gen_server:cast(lock_serv, reset),
     Child1 = spawn_link(?MODULE, child_loop, []),
     Child2 = spawn_link(?MODULE, child_loop, []),
     F(Child1, Child2),
     Child1 ! stop,
-    Child2 ! stop.
+    Child2 ! stop,
+    drain_mailbox().
 
 tests() ->
     run_test(fun test_basic_lock/2),
     run_test(fun test_delayed_lock/2),
-    run_test(fun test_delayed_lock_release/2).
+    run_test(fun test_delayed_lock_release/2),
+    run_test(fun test_unlock_all/2).
 
 start() ->
     error_logger:info_msg("Running tests."),
