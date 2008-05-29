@@ -13,7 +13,8 @@ lock(Socket) ->
 
 % remove the handler and exit
 lock_exit(_Reason) ->
-    error_logger:info_msg("lock_exit:  deleting handler~n", []),
+    error_logger:info_msg("lock_exit:  cleaning up locks~n", []),
+    lock_serv:unlock_all(),
     exit(closed).
 
 lock_response(Socket, Key, R) ->
@@ -86,8 +87,8 @@ loop(Socket, IncomingData) ->
 			loop(Socket, CurrentData);
         % Deaths
         close ->
-            gen_tcp:close(Socket),
-            lock_exit("Close Requested");
+            lock_exit("Close Requested"),
+            loop(Socket, IncomingData);
         {'EXIT', _U, Why} ->
             error_logger:info_msg("lock_serv: exiting:  ~p~n", [Why]),
             gen_tcp:close(Socket),

@@ -23,6 +23,9 @@ Possible return values:
 * 200 - Lock has been acquired
 * 409 - The resource is locked -- you lose
 
+Any acquired lock will be held until it's specifically unlocked, unlocked with
+unlock\_all, or the client disconnects.
+
 ## unlock
 
 Unlock releases the lock with the given key if the current client has acquired

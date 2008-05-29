@@ -1,7 +1,5 @@
 # Phase 1: Basic semantics
 
-* Auto-free locks on disconnect.
-
 ## stats
 
 * Overall stats
