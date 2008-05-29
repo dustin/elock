@@ -16,27 +16,24 @@ lock_exit(_Reason) ->
     error_logger:info_msg("lock_exit:  deleting handler~n", []),
     exit(closed).
 
-% Commands go here.
-process_command(Socket, "lock", [Key]) ->
-    case lock_serv:lock(Key) of
+lock_response(Socket, Key, R) ->
+    case R of
         ok ->
             error_logger:info_msg("Locked ~p~n", [Key]),
             send_response(Socket, 200, "Acquired");
         _ ->
             send_response(Socket, 404, "Unavailable")
-    end;
+    end.
+
+% Commands go here.
+process_command(Socket, "lock", [Key]) ->
+    lock_response(Socket, Key, lock_serv:lock(Key));
 process_command(Socket, "lock", [Key, WaitStr]) ->
     {WaitSecs, []} = string:to_integer(WaitStr),
     % Don't wait longer than erlang allows me to.
     Wait = lists:min([WaitSecs * 1000, 16#ffffffff]),
     error_logger:info_msg("Waiting ~p for ~p~n", [Wait, Key]),
-    case lock_serv:lock(Key, WaitSecs) of
-        ok ->
-            error_logger:info_msg("Locked ~p~n", [Key]),
-            send_response(Socket, 200, "Acquired");
-        _ ->
-            send_response(Socket, 404, "Unavailable")
-    end;
+    lock_response(Socket, Key, lock_serv:lock(Key, WaitSecs));
 process_command(Socket, "unlock", [Key]) ->
     case lock_serv:unlock(Key) of
         ok ->
