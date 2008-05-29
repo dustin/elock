@@ -34,19 +34,40 @@ test_basic_lock(Child1, Child2) ->
     ok = rpc(Child1, unlock, ["test"]),
     not_locked = rpc(Child1, unlock, ["test"]).
 
-run_test(F, Child1, Child2) ->
-    gen_server:cast(lock_serv, reset),
-    F(Child1, Child2).
+test_delayed_lock(Child1, Child2) ->
+    ok = rpc(Child1, lock, ["test", 1000]),
+    locked = rpc(Child2, lock, ["test", 10]),
+    not_yours = rpc(Child2, unlock, ["test"]),
+    ok = rpc(Child1, unlock, ["test"]).
 
-tests(Child1, Child2) ->
-    run_test(fun test_basic_lock/2, Child1, Child2).
+test_delayed_lock_release(Child1, Child2) ->
+    Key = "dr_test",
+    ok = rpc(Child1, lock, [Key]),
+    {ok, _Tref} = timer:send_after(5, Child1, {self(), unlock, [Key]}),
+    % Child1 ! { self(), unlock, [Key]},
+    ok = rpc(Child2, lock, [Key, 50]),
+    % % Drain the message from the deferred delete
+    receive {res, ok} -> ok end,
+    not_yours = rpc(Child1, unlock, [Key]),
+    ok = rpc(Child2, unlock, [Key]).
+
+run_test(F) ->
+    gen_server:cast(lock_serv, reset),
+    Child1 = spawn_link(?MODULE, child_loop, []),
+    Child2 = spawn_link(?MODULE, child_loop, []),
+    F(Child1, Child2),
+    Child1 ! stop,
+    Child2 ! stop.
+
+tests() ->
+    run_test(fun test_basic_lock/2),
+    run_test(fun test_delayed_lock/2),
+    run_test(fun test_delayed_lock_release/2).
 
 start() ->
     error_logger:info_msg("Running tests."),
     lock_serv:start_link(),
-    Child1 = spawn_link(?MODULE, child_loop, []),
-    Child2 = spawn_link(?MODULE, child_loop, []),
 
-    tests(Child1, Child2),
+    tests(),
     
     error_logger:info_msg("Tests complete~n").
