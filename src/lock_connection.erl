@@ -30,10 +30,7 @@ process_command(Socket, "lock", [Key]) ->
     lock_response(Socket, Key, lock_serv:lock(Key));
 process_command(Socket, "lock", [Key, WaitStr]) ->
     {WaitSecs, []} = string:to_integer(WaitStr),
-    % Don't wait longer than erlang allows me to.
-    Wait = lists:min([WaitSecs * 1000, 16#ffffffff]),
-    error_logger:info_msg("Waiting ~p for ~p~n", [Wait, Key]),
-    lock_response(Socket, Key, lock_serv:lock(Key, WaitSecs));
+    lock_response(Socket, Key, lock_serv:lock(Key, WaitSecs * 1000));
 process_command(Socket, "unlock", [Key]) ->
     case lock_serv:unlock(Key) of
         ok ->

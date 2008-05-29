@@ -29,9 +29,9 @@ code_change(_OldVsn, State, _Extra) ->
 lock(Key) ->
     gen_server:call(?MODULE, {lock, Key}).
 
-lock(Key, WaitSecs) ->
+lock(Key, WaitMillis) ->
     % Don't wait longer than erlang allows me to.
-    Wait = lists:min([WaitSecs * 1000, 16#ffffffff]),
+    Wait = lists:min([WaitMillis, 16#ffffffff]),
     case gen_server:call(?MODULE, {lock, Key, Wait}) of
         ok -> ok;
         delayed ->
