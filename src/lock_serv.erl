@@ -48,9 +48,9 @@ handle_call({unlock, Key}, From, Locks) ->
     {Response, Locks2} = unlock(Key, From, Locks),
     {reply, Response, Locks2}.
 
-handle_cast(X, Locks) ->
-    error_logger:info_msg("Got a cast.  Why?  ~p~n", [X]),
-    Locks.
+handle_cast(reset, _Locks) ->
+    error_logger:info_msg("Someone casted a reset", []),
+   {noreply, #lock_state{}}.
 
 % Actual lock handling
 

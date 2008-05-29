@@ -8,6 +8,9 @@ all: lock_serv.boot
 
 tgz: lock_serv.tar.gz
 
+test: ebins
+	erl $(EFLAGS) -run lock_serv_test -run init stop
+
 ebins:
 	test -d ebin || mkdir ebin
 	erl $(EFLAGS) -make
