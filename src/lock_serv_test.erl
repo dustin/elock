@@ -63,6 +63,14 @@ test_unlock_all(Child1, Child2) ->
     ok = rpc(Child2, lock, ["key1"]),
     ok = rpc(Child2, lock, ["key2"]).
 
+test_delayed_unlock_all(Child1, Child2) ->
+    ok = rpc(Child1, lock, ["key1"]),
+    ok = rpc(Child1, lock, ["key2"]),
+    {ok, _Tref} = timer:send_after(5, Child1, {self(), unlock_all, []}),
+    ok = rpc(Child2, lock, ["key1", 50]),
+    receive {res, ok} -> ok end,
+    ok = rpc(Child2, lock, ["key2"]).
+
 drain_mailbox() ->
     case receive _M -> ok after 1 -> done end of
         ok -> drain_mailbox();
@@ -82,7 +90,8 @@ tests() ->
     run_test(fun test_basic_lock/2),
     run_test(fun test_delayed_lock/2),
     run_test(fun test_delayed_lock_release/2),
-    run_test(fun test_unlock_all/2).
+    run_test(fun test_unlock_all/2),
+    run_test(fun test_delayed_unlock_all/2).
 
 start() ->
     error_logger:info_msg("Running tests."),
