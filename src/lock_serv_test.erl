@@ -112,14 +112,16 @@ run_test(F) ->
     drain_mailbox().
 
 tests() ->
-    run_test(fun test_basic_lock/2),
-    run_test(fun test_double_lock/2),
-    run_test(fun test_delayed_lock/2),
-    run_test(fun test_delayed_lock_release/2),
-    run_test(fun test_delayed_lock_release_with_third_child/2),
-    run_test(fun test_unlock_all/2),
-    run_test(fun test_unlock_all_empty/2),
-    run_test(fun test_delayed_unlock_all/2).
+    lists:foreach(fun run_test/1, [
+        fun test_basic_lock/2,
+        fun test_double_lock/2,
+        fun test_delayed_lock/2,
+        fun test_delayed_lock_release/2,
+        fun test_delayed_lock_release_with_third_child/2,
+        fun test_unlock_all/2,
+        fun test_unlock_all_empty/2,
+        fun test_delayed_unlock_all/2
+        ]).
 
 start() ->
     error_logger:info_msg("Running tests."),
