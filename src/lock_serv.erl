@@ -178,7 +178,8 @@ attempt_locker_takeover({From, _Something}, Id, Locks) ->
                     {denied, Locks};
                 error -> {ok, Locks#lock_state{
                     lockers=dict:store(Id, From, Locks#lock_state.lockers),
-                    lockers_rev=dict:store(From, Id, Locks#lock_state.lockers_rev)}}
+                    lockers_rev=dict:store(From, Id, Locks#lock_state.lockers_rev),
+                    mon_refs=ensure_monitoring(From, Locks)}}
             end
     end.
 
