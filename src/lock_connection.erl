@@ -13,8 +13,7 @@ lock(Socket) ->
 
 % remove the handler and exit
 lock_exit(_Reason) ->
-    error_logger:info_msg("lock_exit:  cleaning up locks~n", []),
-    lock_serv:unlock_all(),
+    error_logger:info_msg("lock_exit~n", []),
     exit(closed).
 
 lock_response(Socket, Key, R) ->
