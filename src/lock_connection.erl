@@ -62,6 +62,10 @@ process_command(Socket, "conn_id", [Requested]) ->
         ok -> send_response(Socket, 200, "conn id set");
         denied -> send_response(Socket, 403, "cannot set conn id")
     end;
+process_command(Socket, "set_timeout", [MillisStr]) ->
+    {Millis, []} = string:to_integer(MillisStr),
+    ok = lock_serv:set_timeout(Millis),
+    send_response(Socket, 200, "timeout set");
 process_command(Socket, "quit", _Args) ->
     send_response(Socket, 200, "Hey, it was nice seeing you."),
     self() ! close;
