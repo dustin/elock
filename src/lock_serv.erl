@@ -4,6 +4,7 @@
 
 -export([start_link/0, terminate/2, handle_info/2, code_change/3]).
 -export([lock/1, lock/2, unlock/1, unlock_all/0, get_locker_id/0, stats/0]).
+-export ([set_timeout/1]).
 -export([init/1, handle_call/3, handle_cast/2]).
 
 -include ("lock_stats.hrl").
@@ -22,7 +23,9 @@
     % Simple locker id allocation
     next_locker_id=1,
     % pid -> monitor ref
-    mon_refs=dict:new()
+    mon_refs=dict:new(),
+    % locker_id -> disconnect_timeout,
+    locker_delay=dict:new()
     }).
 
 start_link() ->
@@ -44,12 +47,14 @@ handle_info({'DOWN', _Ref, process, Pid, _Why}, State) ->
     case dict:find(Pid, State#lock_state.lockers_rev) of
         {ok, Id} ->
             dict:find(Pid, State#lock_state.lockers_rev),
-            timer:send_after(5000, {check_disconnect, Id}),
-            % Release all this guy's locks and locker info
-            {noreply, unregister(Pid, State)};
-        error ->
-            {noreply, State}
-    end.
+            timer:send_after(
+                case dict:find(Id, State#lock_state.locker_delay) of
+                    {ok, Delay} -> Delay;
+                    error -> 30000
+                end, {check_disconnect, Id});
+        error -> ok
+    end,
+    {noreply, unregister(Pid, State)}.
 
 code_change(_OldVsn, State, _Extra) ->
     error_logger:info_msg("Code's changing.  Hope that's OK~n", []),
@@ -81,6 +86,9 @@ lock(Key, WaitMillis) ->
 unlock(Key) ->
     gen_server:call(?MODULE, {unlock, Key}).
 
+set_timeout(Millis) ->
+    gen_server:call(?MODULE, {set_timeout, Millis}).
+
 unlock_all() ->
     gen_server:cast(?MODULE, {unlock_all, self()}).
 
@@ -99,6 +107,10 @@ handle_call({unlock, Key}, From, Locks) ->
 handle_call(get_locker_id, From, Locks) ->
     {ok, Response, Locks2} = allocate_or_find_locker_id(From, Locks),
     {reply, Response, Locks2};
+handle_call({set_timeout, Millis}, From, Locks) ->
+    {ok, Id, Locks2} = allocate_or_find_locker_id(From, Locks),
+    {reply, ok, Locks2#lock_state{
+        locker_delay=dict:store(Id, Millis, Locks2#lock_state.locker_delay)}};
 handle_call(stats, From, Locks) ->
     {ok, Response} = stats(From, Locks),
     {reply, Response, Locks}.
@@ -167,11 +179,16 @@ allocate_or_find_locker_id({From, _Something}, Locks) ->
     end.
 
 unregister(Pid, State) ->
-    {ok, Id} = dict:find(Pid, State#lock_state.lockers_rev),
-    State#lock_state{
-        lockers=dict:erase(Id, State#lock_state.lockers),
-        lockers_rev=dict:erase(Pid, State#lock_state.lockers_rev),
-        mon_refs=dict:erase(Pid, State#lock_state.mon_refs)}.
+    case dict:find(Pid, State#lock_state.lockers_rev) of
+        {ok, Id} ->
+            State#lock_state{
+                lockers=dict:erase(Id, State#lock_state.lockers),
+                lockers_rev=dict:erase(Pid, State#lock_state.lockers_rev),
+                mon_refs=dict:erase(Pid, State#lock_state.mon_refs)};
+        error ->
+            State#lock_state{
+                mon_refs=dict:erase(Pid, State#lock_state.mon_refs)}
+    end.
 
 stats({_From, _Something}, Locks) ->
     Rv = #stats{

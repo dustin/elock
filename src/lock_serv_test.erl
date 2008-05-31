@@ -21,6 +21,9 @@ child_loop() ->
         {Sender, get_locker_id, []} ->
             Sender ! {res, lock_serv:get_locker_id()},
             child_loop();
+        {Sender, set_timeout, [Millis]} ->
+            Sender ! {res, lock_serv:set_timeout(Millis)},
+            child_loop();
         stop -> ok
     end.
 
@@ -111,13 +114,14 @@ test_dead_clients_hold_no_locks(Child1, Child2) ->
 test_dead_clients_lose_registration(Child1, _Child2) ->
     rpc(Child1, get_locker_id, []),
     S = lock_serv:stats(),
-    1 = S#stats.clients,
-    1 = S#stats.monitoring,
+    N = S#stats.clients,
+    N = S#stats.monitoring,
     Child1 ! stop,
     timer:sleep(250),
     S2 = lock_serv:stats(),
-    0 = S2#stats.clients,
-    0 = S2#stats.monitoring.
+    M = S2#stats.clients,
+    M = S2#stats.monitoring,
+    M = N - 1.
 
 test_locker_allocation(Child1, Child2) ->
     N = rpc(Child1, get_locker_id, []),
@@ -125,7 +129,7 @@ test_locker_allocation(Child1, Child2) ->
     N = rpc(Child1, get_locker_id, []),
     % Check the stats for a registered record
     S = lock_serv:stats(),
-    1 = S#stats.clients,
+    2 = S#stats.clients,
     % But the second child should have a distinct value
     case rpc(Child2, get_locker_id, []) of
         N -> exit("Duplicate locker ID for second child");
@@ -152,9 +156,10 @@ run_test(F) ->
     gen_server:cast(lock_serv, reset),
     Child1 = spawn_link(?MODULE, child_loop, []),
     Child2 = spawn_link(?MODULE, child_loop, []),
+    lists:foreach(fun(C) -> ok = rpc(C, set_timeout, [5]) end,
+        [Child1, Child2]),
     F(Child1, Child2),
-    Child1 ! stop,
-    Child2 ! stop,
+    lists:foreach(fun(C) -> C ! stop end, [Child1, Child2]),
     drain_mailbox().
 
 tests() ->
