@@ -11,7 +11,7 @@
 -record(lock_state, {
     % Currently held locks (key -> locker_id)
     locks=dict:new(),
-    % Current clients waiting for lock (key -> queue<locker_id>)
+    % Current clients waiting for lock (key -> queue<pid>)
     waiters=dict:new(),
     % Current locks held by clients (locker_id -> list<key)
     clients=dict:new(),
@@ -100,10 +100,11 @@ handle_cast({unlock_all, Pid}, Locks) ->
 
 % Actual lock handling
 
-lock(Key, {From, _Something}, Locks) ->
+lock(Key, {From, Something}, LocksIn) ->
+    {ok, Id, Locks} = allocate_or_find_locker_id({From, Something}, LocksIn),
     case dict:find(Key, Locks#lock_state.locks) of
-        {ok, From} -> {ok, Locks};
-        {ok, _Key} -> {locked, Locks};
+        {ok, Id} -> {ok, Locks};
+        {ok, _SomeoneElse} -> {locked, Locks};
         error -> {ok, unconditional_lock(Key, From, Locks)}
     end.
 
@@ -113,17 +114,18 @@ lock(Key, Wait, {From, Something}, Locks) ->
         _ -> {delayed, enqueue_waiter(Key, Wait, From, Locks)}
     end.
 
-unlock(Key, {From, _Something}, Locks) ->
+unlock(Key, {From, Something}, LocksIn) ->
+    {ok, Id, Locks} = allocate_or_find_locker_id({From, Something}, LocksIn),
     case dict:find(Key, Locks#lock_state.locks) of
-        {ok, From} ->
-            {ok, hand_over_lock(Key, From, Locks)};
+        {ok, Id} -> {ok, hand_over_lock(Key, Id, Locks)};
         {ok, _Someone} -> {not_yours, Locks};
         _ -> {not_locked, Locks}
     end.
 
 unlock_all(Pid, LocksIn) ->
-    lists:foldl(fun(K, Locks) -> hand_over_lock(K, Pid, Locks) end,
-        LocksIn, get_client_list(Pid, LocksIn#lock_state.clients)).
+    {ok, Id, Locks} = allocate_or_find_locker_id({Pid, unknown}, LocksIn),
+    lists:foldl(fun(K, L) -> hand_over_lock(K, Id, L) end,
+        Locks, get_client_list(Id, Locks#lock_state.clients)).
 
 ensure_monitoring(Pid, Locks) ->
     R = Locks#lock_state.mon_refs,
@@ -149,15 +151,11 @@ allocate_or_find_locker_id({From, _Something}, Locks) ->
     end.
 
 unregister(Pid, State) ->
-    case dict:find(Pid, State#lock_state.lockers_rev) of
-        {ok, Id} ->
-            State#lock_state{
-                lockers=dict:erase(Id, State#lock_state.lockers),
-                lockers_rev=dict:erase(Pid, State#lock_state.lockers_rev),
-                mon_refs=dict:erase(Pid, State#lock_state.mon_refs)
-            };
-        _ -> State
-    end.
+    {ok, Id} = dict:find(Pid, State#lock_state.lockers_rev),
+    State#lock_state{
+        lockers=dict:erase(Id, State#lock_state.lockers),
+        lockers_rev=dict:erase(Pid, State#lock_state.lockers_rev),
+        mon_refs=dict:erase(Pid, State#lock_state.mon_refs)}.
 
 stats({_From, _Something}, Locks) ->
     Rv = #stats{
@@ -188,10 +186,11 @@ remove_client(Key, From, D) ->
     end.
 
 % Reserve the lock
-unconditional_lock(Key, From, Locks) ->
+unconditional_lock(Key, From, LocksIn) ->
+    {ok, Id, Locks} = allocate_or_find_locker_id({From, none}, LocksIn),
     Locks#lock_state{
-        locks=dict:store(Key, From, Locks#lock_state.locks),
-        clients=add_client(Key, From, Locks#lock_state.clients),
+        locks=dict:store(Key, Id, Locks#lock_state.locks),
+        clients=add_client(Key, Id, Locks#lock_state.clients),
         mon_refs=ensure_monitoring(From, Locks)}.
 
 % return the specified lock.  If someone else wants it, give it up
