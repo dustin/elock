@@ -78,10 +78,6 @@ loop(Socket, IncomingData) ->
             error_logger:error_msg("lock_serv:  socket error:  ~p~n", [Reason]),
             gen_tcp:close(Socket),
             lock_exit(Reason);
-        % This happens when we obtain a lock after having lost interest
-        {acquiring, _Key, From} ->
-            From ! nak,
-            loop(Socket, CurrentData);
         % Deaths
         close ->
             lock_exit("Close Requested"),
