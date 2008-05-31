@@ -1,1 +1,1 @@
--record (stats, {clients, locks}).
+-record (stats, {clients, locks, monitoring}).

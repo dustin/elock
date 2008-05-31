@@ -20,7 +20,9 @@
     % pid -> locker_id -> locker_id
     lockers_rev=dict:new(),
     % Simple locker id allocation
-    next_locker_id=1
+    next_locker_id=1,
+    % pid -> monitor ref
+    mon_refs=dict:new()
     }).
 
 start_link() ->
@@ -31,7 +33,10 @@ terminate(shutdown, State) ->
 
 handle_info({'EXIT', Pid, Reason}, State) ->
     error_logger:info_msg("Got an exit from ~p: ~p~n", [Pid, Reason]),
-    {noreply, State}.
+    {noreply, State};
+handle_info({'DOWN', _Ref, process, Pid, _Why}, State) ->
+    % Release all this guy's locks and locker info
+    {noreply, unregister(Pid, unlock_all(Pid, State))}.
 
 code_change(_OldVsn, State, _Extra) ->
     error_logger:info_msg("Code's changing.  Hope that's OK~n", []),
@@ -120,6 +125,13 @@ unlock_all(Pid, LocksIn) ->
     lists:foldl(fun(K, Locks) -> hand_over_lock(K, Pid, Locks) end,
         LocksIn, get_client_list(Pid, LocksIn#lock_state.clients)).
 
+ensure_monitoring(Pid, Locks) ->
+    R = Locks#lock_state.mon_refs,
+    case dict:find(Pid, R) of
+        {ok, _ref} -> R;
+        error -> dict:store(Pid, erlang:monitor(process, Pid), R)
+    end.
+
 allocate_or_find_locker_id({From, _Something}, Locks) ->
     case dict:find(From, Locks#lock_state.lockers_rev) of
         {ok, Id} ->
@@ -131,15 +143,32 @@ allocate_or_find_locker_id({From, _Something}, Locks) ->
                 Locks#lock_state{
                     next_locker_id=Cid + 1,
                     lockers=dict:store(Sid, From, Locks#lock_state.lockers),
-                    lockers_rev=dict:store(From, Sid, Locks#lock_state.lockers_rev)
+                    lockers_rev=dict:store(From, Sid, Locks#lock_state.lockers_rev),
+                    mon_refs=ensure_monitoring(From, Locks)
                 }}
     end.
 
+unregister(Pid, State) ->
+    case dict:find(Pid, State#lock_state.lockers_rev) of
+        {ok, Id} ->
+            State#lock_state{
+                lockers=dict:erase(Id, State#lock_state.lockers),
+                lockers_rev=dict:erase(Pid, State#lock_state.lockers_rev),
+                mon_refs=dict:erase(Pid, State#lock_state.mon_refs)
+            };
+        _ -> State
+    end.
+
 stats({_From, _Something}, Locks) ->
-    {ok, #stats{
+    Rv = #stats{
         clients=dict:size(Locks#lock_state.lockers),
-        locks=dict:size(Locks#lock_state.locks)
-        }}.
+        locks=dict:size(Locks#lock_state.locks),
+        monitoring=dict:size(Locks#lock_state.mon_refs)
+    },
+    % Assertion: size(lockers) == size(lockers_rev)
+    Csize = Rv#stats.clients,
+    Csize = dict:size(Locks#lock_state.lockers_rev),
+    {ok, Rv}.
 
 % Private support stuff
 
@@ -162,7 +191,8 @@ remove_client(Key, From, D) ->
 unconditional_lock(Key, From, Locks) ->
     Locks#lock_state{
         locks=dict:store(Key, From, Locks#lock_state.locks),
-        clients=add_client(Key, From, Locks#lock_state.clients)}.
+        clients=add_client(Key, From, Locks#lock_state.clients),
+        mon_refs=ensure_monitoring(From, Locks)}.
 
 % return the specified lock.  If someone else wants it, give it up
 hand_over_lock(Key, From, Locks) ->

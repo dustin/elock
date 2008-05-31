@@ -101,6 +101,24 @@ test_delayed_unlock_all(Child1, Child2) ->
     receive {res, ok} -> ok end,
     ok = rpc(Child2, lock, ["key2"]).
 
+test_dead_clients_hold_no_locks(Child1, Child2) ->
+    ok = rpc(Child1, lock, ["key1"]),
+    ok = rpc(Child1, lock, ["key2"]),
+    {ok, _Tref} = timer:send_after(5, Child1, stop),
+    ok = rpc(Child2, lock, ["key1", 50]),
+    ok = rpc(Child2, lock, ["key2"]).
+
+test_dead_clients_lose_registration(Child1, _Child2) ->
+    rpc(Child1, get_locker_id, []),
+    S = lock_serv:stats(),
+    1 = S#stats.clients,
+    1 = S#stats.monitoring,
+    Child1 ! stop,
+    timer:sleep(250),
+    S2 = lock_serv:stats(),
+    0 = S2#stats.clients,
+    0 = S2#stats.monitoring.
+
 test_locker_allocation(Child1, Child2) ->
     N = rpc(Child1, get_locker_id, []),
     % Validate a second call returns an identical value to the first
@@ -149,6 +167,8 @@ tests() ->
         fun test_unlock_all/2,
         fun test_unlock_all_empty/2,
         fun test_delayed_unlock_all/2,
+        fun test_dead_clients_hold_no_locks/2,
+        fun test_dead_clients_lose_registration/2,
         fun test_locker_allocation/2,
         fun test_stats/2
         ]).
