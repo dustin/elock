@@ -3,8 +3,10 @@
 -behaviour (gen_server).
 
 -export([start_link/0, terminate/2, handle_info/2, code_change/3]).
--export([lock/1, lock/2, unlock/1, unlock_all/0, get_locker_id/0]).
+-export([lock/1, lock/2, unlock/1, unlock_all/0, get_locker_id/0, stats/0]).
 -export([init/1, handle_call/3, handle_cast/2]).
+
+-include ("lock_stats.hrl").
 
 -record(lock_state, {
     % Currently held locks (key -> locker_id)
@@ -37,6 +39,9 @@ code_change(_OldVsn, State, _Extra) ->
 
 get_locker_id() ->
     gen_server:call(?MODULE, get_locker_id).
+
+stats() ->
+    gen_server:call(?MODULE, stats).
 
 lock(Key) ->
     gen_server:call(?MODULE, {lock, Key}).
@@ -75,7 +80,10 @@ handle_call({unlock, Key}, From, Locks) ->
     {reply, Response, Locks2};
 handle_call(get_locker_id, From, Locks) ->
     {ok, Response, Locks2} = allocate_or_find_locker_id(From, Locks),
-    {reply, Response, Locks2}.
+    {reply, Response, Locks2};
+handle_call(stats, From, Locks) ->
+    {ok, Response} = stats(From, Locks),
+    {reply, Response, Locks}.
 
 handle_cast(reset, _Locks) ->
     error_logger:info_msg("Someone casted a reset", []),
@@ -126,6 +134,12 @@ allocate_or_find_locker_id({From, _Something}, Locks) ->
                     lockers_rev=dict:store(From, Sid, Locks#lock_state.lockers_rev)
                 }}
     end.
+
+stats({_From, _Something}, Locks) ->
+    {ok, #stats{
+        clients=dict:size(Locks#lock_state.lockers),
+        locks=dict:size(Locks#lock_state.locks)
+        }}.
 
 % Private support stuff
 

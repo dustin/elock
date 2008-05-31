@@ -2,6 +2,8 @@
 
 -export ([start/0, child_loop/0]).
 
+-include ("lock_stats.hrl").
+
 child_loop() ->
     receive
         {Sender, lock, [Thing, Timeout]} ->
@@ -103,11 +105,24 @@ test_locker_allocation(Child1, Child2) ->
     N = rpc(Child1, get_locker_id, []),
     % Validate a second call returns an identical value to the first
     N = rpc(Child1, get_locker_id, []),
+    % Check the stats for a registered record
+    S = lock_serv:stats(),
+    1 = S#stats.clients,
     % But the second child should have a distinct value
     case rpc(Child2, get_locker_id, []) of
         N -> exit("Duplicate locker ID for second child");
-        _ -> ok
+        _ ->
+            S2 = lock_serv:stats(),
+            2 = S2#stats.clients,
+            ok
     end.
+
+test_stats(Child1, _Child2) ->
+    S = lock_serv:stats(),
+    ok = rpc(Child1, lock, ["key1"]),
+    S2 = lock_serv:stats(),
+    Sum = S#stats.locks + 1,
+    Sum = S2#stats.locks.
 
 drain_mailbox() ->
     case receive _M -> ok after 1 -> done end of
@@ -134,14 +149,15 @@ tests() ->
         fun test_unlock_all/2,
         fun test_unlock_all_empty/2,
         fun test_delayed_unlock_all/2,
-        fun test_locker_allocation/2
+        fun test_locker_allocation/2,
+        fun test_stats/2
         ]).
 
 start() ->
     error_logger:info_msg("Running tests."),
 
     cover:start(),
-    cover:compile("src/lock_serv"),
+    cover:compile("src/lock_serv", [{i, "include"}]),
     lock_serv:start_link(),
     tests(),
     {ok, CovRes} = cover:analyse_to_file(lock_serv, "cov.html", [html]),
