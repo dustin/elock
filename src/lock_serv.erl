@@ -89,7 +89,7 @@ lock(Key, WaitMillis) ->
 unlock(Key) ->
     gen_server:call(?MODULE, {unlock, Key}).
 
-set_timeout(Millis) ->
+set_timeout(Millis) when is_integer(Millis) ->
     gen_server:call(?MODULE, {set_timeout, Millis}).
 
 unlock_all() ->
