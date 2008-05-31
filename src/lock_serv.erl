@@ -34,9 +34,22 @@ terminate(shutdown, State) ->
 handle_info({'EXIT', Pid, Reason}, State) ->
     error_logger:info_msg("Got an exit from ~p: ~p~n", [Pid, Reason]),
     {noreply, State};
+handle_info({check_disconnect, Id}, State) ->
+    case dict:find(Id, State#lock_state.lockers) of
+        error -> {noreply, unlock_all_by_id(Id, State)};
+        {ok, _Pid} -> {noreply, State}
+    end;
 handle_info({'DOWN', _Ref, process, Pid, _Why}, State) ->
-    % Release all this guy's locks and locker info
-    {noreply, unregister(Pid, unlock_all(Pid, State))}.
+    % Schedule a check in a bit to see if anyone's claiming this guy's id
+    case dict:find(Pid, State#lock_state.lockers_rev) of
+        {ok, Id} ->
+            dict:find(Pid, State#lock_state.lockers_rev),
+            timer:send_after(5000, {check_disconnect, Id}),
+            % Release all this guy's locks and locker info
+            {noreply, unregister(Pid, State)};
+        error ->
+            {noreply, State}
+    end.
 
 code_change(_OldVsn, State, _Extra) ->
     error_logger:info_msg("Code's changing.  Hope that's OK~n", []),
@@ -124,6 +137,9 @@ unlock(Key, {From, Something}, LocksIn) ->
 
 unlock_all(Pid, LocksIn) ->
     {ok, Id, Locks} = allocate_or_find_locker_id({Pid, unknown}, LocksIn),
+    unlock_all_by_id(Id, Locks).
+
+unlock_all_by_id(Id, Locks) ->
     lists:foldl(fun(K, L) -> hand_over_lock(K, Id, L) end,
         Locks, get_client_list(Id, Locks#lock_state.clients)).
 
