@@ -64,13 +64,11 @@ send_response(Socket, Status, Message) when integer(Status) ->
     send_response(Socket, integer_to_list(Status), Message).
 
 loop(Socket, IncomingData) ->
-    error_logger:info_msg("Current data:  ~p~n", [IncomingData]),
     CurrentData = process_incoming(Socket, IncomingData,
         string:str(IncomingData, "\r\n")),
     receive
         % Inbound messages
         {tcp, Socket, Bytes} ->
-            error_logger:error_msg("lock_serv: Received data:  ~p~n", [Bytes]),
             loop(Socket, CurrentData ++ Bytes);
         % Control messages
         {tcp_closed, Socket} ->
