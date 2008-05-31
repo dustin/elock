@@ -46,6 +46,35 @@ Possible return values:
 
 * 200 - It just blows it all away
 
+## conn\_id
+
+Retrieve your current session ID.  This may be resumed later.
+
+Returns:
+
+* 200 [some\_string]
+
+## conn\_id [string]
+
+Attempts to set your connection ID to the given value.
+
+This allows you to resume a session if you get disconnected.
+
+Returns:
+
+* 200 - Resumed
+* 403 - Could not resume connection (you either already have a new one, or
+        that one belongs to someone else)
+
+## set\_timeout [integer]
+
+Set the amount of time after disconnect (in milliseconds) before your locks
+are all automatically freed.  Default is 30,000 (30 seconds).
+
+Returns:
+
+* 200 - the new value was set
+
 ## quit
 
 Disconnect your connection.
