@@ -149,7 +149,7 @@ test_locker_takeover_rejected(Child1, _Child2) ->
     Child3 ! stop.
 
 test_locker_takeover_rejected_2(Child1, _Child2) ->
-    N = rpc(Child1, get_locker_id, []),
+    _N = rpc(Child1, get_locker_id, []),
     denied = rpc(Child1, set_locker_id, ["arbitrary_value"]).
 
 test_locker_takeover_success(Child1, Child2) ->
