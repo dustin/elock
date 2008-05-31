@@ -2,6 +2,8 @@
 
 -export ([lock/1]).
 
+-include ("lock_stats.hrl").
+
 lock(Socket) ->
     process_flag(trap_exit, true),
     receive
@@ -25,6 +27,11 @@ lock_response(Socket, Key, R) ->
             send_response(Socket, 409, "Unavailable")
     end.
 
+format_stats(Stats) ->
+    io_lib:format(
+        "STATS~nSTAT clients ~p~nSTAT locks ~p~nSTAT monitoring ~p~nEND",
+        [Stats#stats.clients, Stats#stats.locks, Stats#stats.monitoring]).
+
 % Commands go here.
 process_command(Socket, "lock", [Key]) ->
     lock_response(Socket, Key, lock_serv:lock(Key));
@@ -44,6 +51,9 @@ process_command(Socket, "unlock_all", []) ->
     send_response(Socket, 200, "OK");
 process_command(Socket, "echo", Args) ->
     send_response(Socket, 200, io_lib:format("~p", [Args]));
+process_command(Socket, "stats", []) ->
+    Stats = lock_serv:stats(),
+    send_response(Socket, 200, format_stats(Stats));
 process_command(Socket, "quit", _Args) ->
     send_response(Socket, 200, "Hey, it was nice seeing you."),
     self() ! close;
