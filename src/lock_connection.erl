@@ -54,6 +54,14 @@ process_command(Socket, "echo", Args) ->
 process_command(Socket, "stats", []) ->
     Stats = lock_serv:stats(),
     send_response(Socket, 200, format_stats(Stats));
+process_command(Socket, "conn_id", []) ->
+    send_response(Socket, 200, lock_serv:get_locker_id());
+process_command(Socket, "conn_id", [Requested]) ->
+    error_logger:info_msg("Wanting to set conn id to ~p", [Requested]),
+    case lock_serv:set_locker_id(Requested) of
+        ok -> send_response(Socket, 200, "conn id set");
+        denied -> send_response(Socket, 403, "cannot set conn id")
+    end;
 process_command(Socket, "quit", _Args) ->
     send_response(Socket, 200, "Hey, it was nice seeing you."),
     self() ! close;

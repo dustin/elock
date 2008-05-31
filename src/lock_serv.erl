@@ -167,10 +167,15 @@ unlock_all_by_id(Id, Locks) ->
 
 attempt_locker_takeover({From, _Something}, Id, Locks) ->
     case dict:find(From, Locks#lock_state.lockers_rev) of
-        {ok, _X} -> {denied, Locks};
+        {ok, X} ->
+            error_logger:info_msg("Attempting to overrite id ~p -> ~p",
+                [Id, X]),
+            {denied, Locks};
         error ->
             case dict:find(Id, Locks#lock_state.lockers) of
-                {ok, _X} -> {denied, Locks};
+                {ok, _X} ->
+                    error_logger:info_msg("Attempting to hijack id ~p", [Id]),
+                    {denied, Locks};
                 error -> {ok, Locks#lock_state{
                     lockers=dict:store(Id, From, Locks#lock_state.lockers),
                     lockers_rev=dict:store(From, Id, Locks#lock_state.lockers_rev)}}
@@ -190,7 +195,7 @@ allocate_or_find_locker_id({From, _Something}, Locks) ->
             {ok, Id, Locks};
         _ ->
             Cid = Locks#lock_state.next_locker_id,
-            Sid = io_lib:format("~p", [Cid]),
+            Sid = lists:flatten(io_lib:format("~p", [Cid])),
             {ok, Sid,
                 Locks#lock_state{
                     next_locker_id=Cid + 1,
