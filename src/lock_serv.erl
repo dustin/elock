@@ -39,7 +39,7 @@ handle_info({'EXIT', Pid, Reason}, State) ->
     {noreply, State};
 handle_info({check_disconnect, Id}, State) ->
     case dict:find(Id, State#lock_state.lockers) of
-        error -> {noreply, unlock_all_by_id(Id, State)};
+        error -> {noreply, cleanup_id(Id, State)};
         {ok, _Pid} -> {noreply, State}
     end;
 handle_info({'DOWN', _Ref, process, Pid, _Why}, State) ->
@@ -156,6 +156,10 @@ unlock(Key, {From, Something}, LocksIn) ->
 unlock_all(Pid, LocksIn) ->
     {ok, Id, Locks} = allocate_or_find_locker_id({Pid, unknown}, LocksIn),
     unlock_all_by_id(Id, Locks).
+
+cleanup_id(Id, State) ->
+    unlock_all_by_id(Id, State#lock_state{
+        locker_delay=dict:erase(Id, State#lock_state.locker_delay)}).
 
 unlock_all_by_id(Id, Locks) ->
     lists:foldl(fun(K, L) -> hand_over_lock(K, Id, L) end,
