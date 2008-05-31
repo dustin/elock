@@ -21,6 +21,9 @@ child_loop() ->
         {Sender, get_locker_id, []} ->
             Sender ! {res, lock_serv:get_locker_id()},
             child_loop();
+        {Sender, set_locker_id, [Id]} ->
+            Sender ! {res, lock_serv:set_locker_id(Id)},
+            child_loop();
         {Sender, set_timeout, [Millis]} ->
             Sender ! {res, lock_serv:set_timeout(Millis)},
             child_loop();
@@ -139,6 +142,26 @@ test_locker_allocation(Child1, Child2) ->
             ok
     end.
 
+test_locker_takeover_rejected(Child1, _Child2) ->
+    N = rpc(Child1, get_locker_id, []),
+    Child3 = spawn_link(?MODULE, child_loop, []),
+    denied = rpc(Child3, set_locker_id, [N]),
+    Child3 ! stop.
+
+test_locker_takeover_rejected_2(Child1, _Child2) ->
+    N = rpc(Child1, get_locker_id, []),
+    denied = rpc(Child1, set_locker_id, ["arbitrary_value"]).
+
+test_locker_takeover_success(Child1, Child2) ->
+    N = rpc(Child1, get_locker_id, []),
+    ok = rpc(Child1, lock, ["test"]),
+    Child1 ! stop,
+    Child3 = spawn_link(?MODULE, child_loop, []),
+    ok = rpc(Child3, set_locker_id, [N]),
+    locked = rpc(Child2, lock, ["test"]),
+    ok = rpc(Child3, lock, ["test"]),
+    Child3 ! stop.
+
 test_stats(Child1, _Child2) ->
     S = lock_serv:stats(),
     ok = rpc(Child1, lock, ["key1"]),
@@ -175,6 +198,9 @@ tests() ->
         fun test_dead_clients_hold_no_locks/2,
         fun test_dead_clients_lose_registration/2,
         fun test_locker_allocation/2,
+        fun test_locker_takeover_rejected/2,
+        fun test_locker_takeover_rejected_2/2,
+        fun test_locker_takeover_success/2,
         fun test_stats/2
         ]).
 

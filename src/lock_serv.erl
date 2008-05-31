@@ -4,7 +4,7 @@
 
 -export([start_link/0, terminate/2, handle_info/2, code_change/3]).
 -export([lock/1, lock/2, unlock/1, unlock_all/0, get_locker_id/0, stats/0]).
--export ([set_timeout/1]).
+-export([set_timeout/1, set_locker_id/1]).
 -export([init/1, handle_call/3, handle_cast/2]).
 
 -include ("lock_stats.hrl").
@@ -63,6 +63,9 @@ code_change(_OldVsn, State, _Extra) ->
 get_locker_id() ->
     gen_server:call(?MODULE, get_locker_id).
 
+set_locker_id(Id) ->
+    gen_server:call(?MODULE, {set_locker_id, Id}).
+
 stats() ->
     gen_server:call(?MODULE, stats).
 
@@ -106,6 +109,9 @@ handle_call({unlock, Key}, From, Locks) ->
     {reply, Response, Locks2};
 handle_call(get_locker_id, From, Locks) ->
     {ok, Response, Locks2} = allocate_or_find_locker_id(From, Locks),
+    {reply, Response, Locks2};
+handle_call({set_locker_id, Id}, From, Locks) ->
+    {Response, Locks2} = attempt_locker_takeover(From, Id, Locks),
     {reply, Response, Locks2};
 handle_call({set_timeout, Millis}, From, Locks) ->
     {ok, Id, Locks2} = allocate_or_find_locker_id(From, Locks),
@@ -154,6 +160,18 @@ unlock_all(Pid, LocksIn) ->
 unlock_all_by_id(Id, Locks) ->
     lists:foldl(fun(K, L) -> hand_over_lock(K, Id, L) end,
         Locks, get_client_list(Id, Locks#lock_state.clients)).
+
+attempt_locker_takeover({From, _Something}, Id, Locks) ->
+    case dict:find(From, Locks#lock_state.lockers_rev) of
+        {ok, _X} -> {denied, Locks};
+        error ->
+            case dict:find(Id, Locks#lock_state.lockers) of
+                {ok, _X} -> {denied, Locks};
+                error -> {ok, Locks#lock_state{
+                    lockers=dict:store(Id, From, Locks#lock_state.lockers),
+                    lockers_rev=dict:store(From, Id, Locks#lock_state.lockers_rev)}}
+            end
+    end.
 
 ensure_monitoring(Pid, Locks) ->
     R = Locks#lock_state.mon_refs,
