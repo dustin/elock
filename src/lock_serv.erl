@@ -3,16 +3,22 @@
 -behaviour (gen_server).
 
 -export([start_link/0, terminate/2, handle_info/2, code_change/3]).
--export([lock/1, lock/2, unlock/1, unlock_all/0]).
+-export([lock/1, lock/2, unlock/1, unlock_all/0, get_locker_id/0]).
 -export([init/1, handle_call/3, handle_cast/2]).
 
 -record(lock_state, {
-    % Currently held locks (key -> pid)
+    % Currently held locks (key -> locker_id)
     locks=dict:new(),
-    % Current clients waiting for lock (key -> queue<pid>)
+    % Current clients waiting for lock (key -> queue<locker_id>)
     waiters=dict:new(),
-    % Current locks held by clients (pid -> list<key)
-    clients=dict:new()
+    % Current locks held by clients (locker_id -> list<key)
+    clients=dict:new(),
+    % locker_id -> pid mappings
+    lockers=dict:new(),
+    % pid -> locker_id -> locker_id
+    lockers_rev=dict:new(),
+    % Simple locker id allocation
+    next_locker_id=1
     }).
 
 start_link() ->
@@ -28,6 +34,9 @@ handle_info({'EXIT', Pid, Reason}, State) ->
 code_change(_OldVsn, State, _Extra) ->
     error_logger:info_msg("Code's changing.  Hope that's OK~n", []),
     {ok, State}.
+
+get_locker_id() ->
+    gen_server:call(?MODULE, get_locker_id).
 
 lock(Key) ->
     gen_server:call(?MODULE, {lock, Key}).
@@ -63,6 +72,9 @@ handle_call({lock, Key, Wait}, From, Locks) ->
     {reply, Response, Locks2};
 handle_call({unlock, Key}, From, Locks) ->
     {Response, Locks2} = unlock(Key, From, Locks),
+    {reply, Response, Locks2};
+handle_call(get_locker_id, From, Locks) ->
+    {ok, Response, Locks2} = allocate_or_find_locker_id(From, Locks),
     {reply, Response, Locks2}.
 
 handle_cast(reset, _Locks) ->
@@ -99,6 +111,21 @@ unlock(Key, {From, _Something}, Locks) ->
 unlock_all(Pid, LocksIn) ->
     lists:foldl(fun(K, Locks) -> hand_over_lock(K, Pid, Locks) end,
         LocksIn, get_client_list(Pid, LocksIn#lock_state.clients)).
+
+allocate_or_find_locker_id({From, _Something}, Locks) ->
+    case dict:find(From, Locks#lock_state.lockers_rev) of
+        {ok, Id} ->
+            {ok, Id, Locks};
+        _ ->
+            Cid = Locks#lock_state.next_locker_id,
+            Sid = io_lib:format("~p", [Cid]),
+            {ok, Sid,
+                Locks#lock_state{
+                    next_locker_id=Cid + 1,
+                    lockers=dict:store(Sid, From, Locks#lock_state.lockers),
+                    lockers_rev=dict:store(From, Sid, Locks#lock_state.lockers_rev)
+                }}
+    end.
 
 % Private support stuff
 

@@ -16,6 +16,9 @@ child_loop() ->
         {Sender, unlock_all, []} ->
             Sender ! {res, lock_serv:unlock_all()},
             child_loop();
+        {Sender, get_locker_id, []} ->
+            Sender ! {res, lock_serv:get_locker_id()},
+            child_loop();
         stop -> ok
     end.
 
@@ -96,6 +99,16 @@ test_delayed_unlock_all(Child1, Child2) ->
     receive {res, ok} -> ok end,
     ok = rpc(Child2, lock, ["key2"]).
 
+test_locker_allocation(Child1, Child2) ->
+    N = rpc(Child1, get_locker_id, []),
+    % Validate a second call returns an identical value to the first
+    N = rpc(Child1, get_locker_id, []),
+    % But the second child should have a distinct value
+    case rpc(Child2, get_locker_id, []) of
+        N -> exit("Duplicate locker ID for second child");
+        _ -> ok
+    end.
+
 drain_mailbox() ->
     case receive _M -> ok after 1 -> done end of
         ok -> drain_mailbox();
@@ -120,7 +133,8 @@ tests() ->
         fun test_delayed_lock_release_with_third_child/2,
         fun test_unlock_all/2,
         fun test_unlock_all_empty/2,
-        fun test_delayed_unlock_all/2
+        fun test_delayed_unlock_all/2,
+        fun test_locker_allocation/2
         ]).
 
 start() ->
