@@ -266,23 +266,22 @@ hand_over_lock(Key, From, Locks) ->
     end.
 
 try_waiter(Key, From, Q, Locks) ->
-    case queue:is_empty(Q) of
-    true ->
-        Locks#lock_state{
-            locks=dict:erase(Key, Locks#lock_state.locks),
-            clients=remove_client(Key, From, Locks#lock_state.clients)};
-    _ ->
-        {{value, Waiter}, Q2} = queue:out(Q),
-        Waiter ! {acquiring, Key, self()},
-        receive
-            {ack, Waiter} ->
-                Waiter ! {acquired, Key},
-                unconditional_lock(Key, Waiter,
-                    Locks#lock_state{
-                        waiters=dict:store(Key, Q2, Locks#lock_state.waiters)})
-            after 25 ->
-                try_waiter(Key, From, Q2, Locks)
-        end
+    case queue:out(Q) of
+        {{value, Waiter}, Q2} ->
+            Waiter ! {acquiring, Key, self()},
+            receive
+                {ack, Waiter} ->
+                    Waiter ! {acquired, Key},
+                    unconditional_lock(Key, Waiter,
+                        Locks#lock_state{
+                            waiters=dict:store(Key, Q2, Locks#lock_state.waiters)})
+                after 25 ->
+                    try_waiter(Key, From, Q2, Locks)
+            end;
+        {empty, _Q2} ->
+            Locks#lock_state{
+                locks=dict:erase(Key, Locks#lock_state.locks),
+                clients=remove_client(Key, From, Locks#lock_state.clients)}
     end.
 
 % I may want to have this thing magically time out after a while.
