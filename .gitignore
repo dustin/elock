@@ -1,6 +1,6 @@
 ebin
-lock_serv.boot
-lock_serv.script
-lock_serv.log
+lock_supervisor.boot
+lock_supervisor.script
+lock_supervisor.log
 erl_crash.dump
 cov.html

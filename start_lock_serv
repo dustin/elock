@@ -4,4 +4,4 @@
 # ./start_lock_serv -noinput -boot environ
 
 # interactive
-erl "$@" -mnesia dir "\"$HOME/tmp/mnesia\"" -pa ebin -boot lock_serv
+erl "$@" -mnesia dir "\"$HOME/tmp/mnesia\"" -pa ebin -boot lock_supervisor

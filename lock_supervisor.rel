@@ -8,7 +8,6 @@
     {"lock_serv_rel", "1.0"},
     {erts, "5.3"},
     [ {kernel, "2.12.2"}, {stdlib, "1.15.2"},
-        {lock_tcp_listener, "1.0"},
-        {lock_serv, "1.0"}
+        {lock_supervisor, "1.0"}
     ]
 }.
