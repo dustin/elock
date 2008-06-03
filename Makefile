@@ -25,4 +25,5 @@ lock_serv.tar.gz: lock_serv.boot
 
 clean:
 	rm -f lock_serv.beam lock_serv.boot lock_serv.script lock_serv.tar.gz
+	rm -f cov.html erl_crash.dump
 	rm -rf ebin
