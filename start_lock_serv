@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Simple one node detached server
-# ./start_lock_serv -noinput -boot environ
+# ./start_lock_serv -noinput -detached
 
 # interactive
-erl "$@" -mnesia dir "\"$HOME/tmp/mnesia\"" -pa ebin -boot lock_supervisor
+erl "$@" -pa ebin -boot lock_supervisor
