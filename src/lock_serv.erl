@@ -81,7 +81,9 @@ lock(Key, WaitMillis) ->
             receive
                 {acquiring, Key, From} ->
                     From ! {ack, self()},
-                    receive {acquired, Key} -> ok end
+                    receive {acquired, Key} -> ok end;
+                {'DOWN', _Ref, process, _Parent, Why} ->
+                    exit(Why)
                 after Wait -> locked
             end
     end.

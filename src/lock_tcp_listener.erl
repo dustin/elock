@@ -29,7 +29,7 @@ init(PortNum) ->
 % Accept incoming connections
 accept_loop(LS) ->
     {ok, NS} = gen_tcp:accept(LS),
-    Pid = spawn(lock_connection, lock, [NS]),
+    Pid = spawn(lock_connection, lock, [NS, self()]),
     gen_tcp:controlling_process(NS, Pid),
     Pid ! go_ahead,
     % Check to see if there's a stop message.

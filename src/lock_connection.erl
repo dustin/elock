@@ -1,11 +1,12 @@
 -module (lock_connection).
 
--export ([lock/1]).
+-export ([lock/2]).
 
 -include ("lock_stats.hrl").
 
-lock(Socket) ->
+lock(Socket, Parent) ->
     process_flag(trap_exit, true),
+    erlang:monitor(process, Parent),
     receive
         go_ahead ->
             inet:setopts(Socket, [{active, true}])
@@ -106,6 +107,10 @@ loop(Socket, IncomingData) ->
             loop(Socket, IncomingData);
         {'EXIT', _U, Why} ->
             error_logger:info_msg("lock_serv: exiting:  ~p~n", [Why]),
+            gen_tcp:close(Socket),
+            lock_exit(Why);
+        {'DOWN', _Ref, process, _Parent, Why} ->
+            error_logger:error_msg("Parent died (~p), shutting down", [Why]),
             gen_tcp:close(Socket),
             lock_exit(Why);
         % Unknown
