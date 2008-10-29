@@ -79,3 +79,33 @@ Returns:
 
 Disconnect your connection.
 
+## stats
+
+Get some server stats.
+
+Returns:
+
+* 200 STATS - beginning of a stat stream (see below)
+
+The stats output is multi-line, so the protocol handling is a little different
+from all of the other commands.
+
+The initial response is
+
+    200 STATS
+
+which is followed by several values in the following form:
+
+    STAT [key] [value]
+
+and then one terminating value:
+
+    END
+
+A complete example is as follows:
+
+    200 STATS
+    STAT clients 0
+    STAT locks 0
+    STAT monitoring 0
+    END
