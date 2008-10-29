@@ -73,13 +73,31 @@ process_command(Socket, "quit", _Args) ->
 process_command(Socket, Cmd, _Args) ->
     send_response(Socket, 400, io_lib:format("Unknown command: ~p", [Cmd])).
 
-process_incoming(_Socket, Data, 0) ->
-    Data;
-process_incoming(Socket, Data, Pos) ->
-    [Cmd|Args] = string:tokens(string:strip(string:substr(Data, 1, Pos-1)), " "),
+kill_whitey(S) ->
+	string:strip(
+		string:strip(
+			string:strip(S, both, $\n), both, $\r), both, $\ ).
+
+extract_line(Data) ->
+	Pos = string:chr(Data, $\n),
+	Line = kill_whitey(string:substr(Data, 1, Pos-1)),
+	Rest = string:strip(string:substr(Data, Pos), left, $\n),
+	{Line, Rest}.
+
+process_incoming(_Socket, Data, false) ->
+    {nomore, Data};
+process_incoming(Socket, Data, true) ->
+	{Line, Extra} = extract_line(Data),
+    [Cmd|Args] = string:tokens(string:strip(Line), " "),
     error_logger:info_msg("Got command:  ~p(~p)~n", [Cmd, Args]),
     process_command(Socket, Cmd, Args),
-    "".
+    {more, Extra}.
+
+process_incoming(Socket, Data) ->
+	case process_incoming(Socket, Data, lists:member($\n, Data)) of
+		{more, Data2} -> process_incoming(Socket, Data2);
+		{nomore, Data2} -> Data2
+	end.
 
 send_response(Socket, Status, Message) when list(Status) ->
     gen_tcp:send(Socket, [Status, " ", Message, <<13,10>>]);
@@ -87,8 +105,7 @@ send_response(Socket, Status, Message) when integer(Status) ->
     send_response(Socket, integer_to_list(Status), Message).
 
 loop(Socket, IncomingData) ->
-    CurrentData = process_incoming(Socket, IncomingData,
-        string:str(IncomingData, "\r\n")),
+    CurrentData = process_incoming(Socket, IncomingData),
     receive
         % Inbound messages
         {tcp, Socket, Bytes} ->
