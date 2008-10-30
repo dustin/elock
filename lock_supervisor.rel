@@ -7,7 +7,7 @@
 {release,
     {"lock_serv_rel", "1.0"},
     {erts, "5.3"},
-    [ {kernel, "2.12.2"}, {stdlib, "1.15.2"},
+    [ {kernel, "2.12.4"}, {stdlib, "1.15.4"},
         {lock_supervisor, "1.0"}
     ]
 }.
