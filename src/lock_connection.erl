@@ -29,9 +29,13 @@ lock_response(Socket, Key, R) ->
     end.
 
 format_stats(Stats) ->
-    io_lib:format(
-        "STATS~nSTAT clients ~p~nSTAT locks ~p~nSTAT monitoring ~p~nEND",
-        [Stats#stats.clients, Stats#stats.locks, Stats#stats.monitoring]).
+	Lines = [
+		"STATS",
+		io_lib:format("STAT clients ~p", [Stats#stats.clients]),
+		io_lib:format("STAT locks ~p", [Stats#stats.locks]),
+		io_lib:format("STAT monitoring ~p", [Stats#stats.monitoring]),
+		"END"],
+	string:join(Lines, [13,10]).
 
 % Commands go here.
 process_command(Socket, "lock", [Key]) ->
