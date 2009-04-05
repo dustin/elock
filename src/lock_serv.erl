@@ -129,7 +129,6 @@ handle_cast(reset, _Locks) ->
 handle_cast({unlock_all, Pid}, Locks) ->
    error_logger:info_msg("Unlocking all owned by ~p", [Pid]),
   {noreply, unlock_all(Pid, Locks)}.
-  
 
 % Actual lock handling
 

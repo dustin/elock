@@ -213,5 +213,5 @@ start() ->
     tests(),
     {ok, CovRes} = cover:analyse_to_file(lock_serv, "cov.html", [html]),
     error_logger:info_msg("Coverage report:  ~p~n", [CovRes]),
-    
+
     error_logger:info_msg("Tests complete~n").
